@@ -6,7 +6,7 @@ module Koudoku::Subscription
     # We don't store these one-time use tokens, but this is what Stripe provides
     # client-side after storing the credit card information.
     attr_accessor :credit_card_token
-    
+
     belongs_to :plan
 
     # update details.
@@ -14,7 +14,7 @@ module Koudoku::Subscription
     def processing!
 
       # if their package level has changed ..
-      if changing_plans? 
+      if changing_plans?
 
         prepare_for_plan_change
 
@@ -70,9 +70,11 @@ module Koudoku::Subscription
               customer_attributes = {
                 description: subscription_owner_description,
                 email: subscription_owner_email,
-                card: credit_card_token, # obtained with Stripe.js
                 plan: plan.stripe_id
               }
+              if plan.price > 0.0 and credit_card_token.present?
+                customer_attributes[:card] = credit_card_token # obtained with Stripe.js
+              end
 
               # If the class we're being included in supports coupons ..
               if respond_to? :coupon
@@ -83,7 +85,7 @@ module Koudoku::Subscription
 
               # create a customer at that package level.
               customer = Stripe::Customer.create(customer_attributes)
-              
+
             rescue Stripe::CardError => card_error
               errors[:base] << card_error.message
               card_was_declined
@@ -92,7 +94,7 @@ module Koudoku::Subscription
 
             # store the customer id.
             self.stripe_id = customer.id
-            self.last_four = customer.cards.retrieve(customer.default_card).last4
+            self.last_four = customer.cards.retrieve(customer.default_card).last4 if customer.cards.count >0
 
             finalize_new_subscription!
             finalize_upgrade!
@@ -111,12 +113,12 @@ module Koudoku::Subscription
         end
 
         finalize_plan_change!
-        
+
       # if they're updating their credit card details.
       elsif self.credit_card_token.present?
-        
+
         prepare_for_card_update
-        
+
         # fetch the customer.
         customer = Stripe::Customer.retrieve(self.stripe_id)
         customer.card = self.credit_card_token
@@ -142,7 +144,7 @@ module Koudoku::Subscription
       else
         if Koudoku.free_trial?
           "Start Trial"
-        else 
+        else
           "Upgrade"
         end
       end
@@ -199,7 +201,7 @@ module Koudoku::Subscription
 
   def prepare_for_cancelation
   end
-  
+
   def prepare_for_card_update
   end
 
@@ -223,14 +225,14 @@ module Koudoku::Subscription
 
   def card_was_declined
   end
-  
+
   # stripe web-hook callbacks.
   def payment_succeeded(amount)
   end
-  
+
   def charge_failed
   end
-  
+
   def charge_disputed
   end
 
