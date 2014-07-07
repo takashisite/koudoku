@@ -1,6 +1,9 @@
 module Koudoku
   class WebhooksController < ApplicationController
 
+    skip_before_filter :verify_authenticity_token
+
+
     def create
       
       raise "API key not configured. For security reasons you must configure this in 'config/koudoku.rb'." unless Koudoku.webhooks_api_key.present?
