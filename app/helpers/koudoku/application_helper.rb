@@ -7,6 +7,8 @@ module Koudoku
 
     def plan_interval(plan)
       case plan.interval
+      when "3 days"
+        "3days"
       when "month"
         "month"
       when "year"
@@ -17,10 +19,10 @@ module Koudoku
         "half-year"
       when "3-month"
         "quarter"
-      else 
+      else
         "month"
       end
     end
-    
+
   end
 end
