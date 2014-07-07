@@ -17,13 +17,13 @@ module Koudoku
     def load_owner
       unless params[:owner_id].nil?
         if current_owner.present?
-          
+
           # we need to try and look this owner up via the find method so that we're
           # taking advantage of any override of the find method that would be provided
           # by older versions of friendly_id. (support for newer versions default behavior
           # below.)
           searched_owner = current_owner.class.find(params[:owner_id]) rescue nil
-          
+
           # if we couldn't find them that way, check whether there is a new version of
           # friendly_id in place that we can use to look them up by their slug.
           # in christoph's words, "why?!" in my words, "warum?!!!"
@@ -31,7 +31,7 @@ module Koudoku
           if searched_owner.nil? && current_owner.class.respond_to?(:friendly)
             searched_owner = current_owner.class.friendly.find(params[:owner_id]) rescue nil
           end
-          
+
           if current_owner.try(:id) == searched_owner.try(:id)
             @owner = current_owner
           else
@@ -74,7 +74,7 @@ module Koudoku
 
       # Load all plans.
       @plans = ::Plan.order(:display_order).all
-      
+
       # Don't prep a subscription unless a user is authenticated.
       unless no_owner?
         # we should also set the owner of the subscription here.
@@ -96,7 +96,7 @@ module Koudoku
           else
             redirect_to_sign_up
           end
-          
+
         else
           raise "This feature depends on Devise for authentication."
         end
@@ -136,9 +136,42 @@ module Koudoku
     end
 
     def edit
+      if params['update'] == 'plan-card'
+        @subscription.plan_id=params['plan_id']
+      end
     end
 
     def update
+      plan = ::Plan.find(subscription_params['plan_id'])
+      if (@subscription.last_four.nil? && plan.price > 0.0 && subscription_params['last_four'].nil?)
+
+        @subscription.plan_id = subscription_params['plan_id']
+        logger.debug(@subscription.inspect)
+        redirect_to edit_owner_subscription_path(@owner, @subscription, update: 'plan-card', :plan_id => '2')
+        return
+
+      elsif (@subscription.last_four.nil? && plan.price > 0.0 && subscription_params['last_four'].present?)
+        plan_subscription_params = Hash::new
+        card_subscription_params = Hash::new
+        plan_subscription_params['plan_id'] = subscription_params['plan_id']
+        card_subscription_params = subscription_params
+        card_subscription_params.delete("plan_id")
+
+        if @subscription.update_attributes(card_subscription_params)
+          if @subscription.update_attributes(plan_subscription_params)
+            flash[:notice] = "You've successfully updated your subscription."
+            redirect_to owner_subscription_path(@owner, @subscription)
+          else
+            flash[:error] = 'There was a problem processing this transaction.'
+            render :edit
+          end
+        else
+          flash[:error] = 'There was a problem processing this transaction.'
+          render :edit
+        end
+        return
+      end
+
       if @subscription.update_attributes(subscription_params)
         flash[:notice] = "You've successfully updated your subscription."
         redirect_to owner_subscription_path(@owner, @subscription)
@@ -150,7 +183,7 @@ module Koudoku
 
     private
     def subscription_params
-      
+
       # If strong_parameters is around, use that.
       if defined?(ActionController::StrongParameters)
         params.require(:subscription).permit(:plan_id, :stripe_id, :current_price, :credit_card_token, :card_type, :last_four)
