@@ -15,14 +15,16 @@ module Koudoku
     include Rails::Generators::Migration
 
     argument :subscription_owner_model, :type => :string, :required => true, :desc => "Owner of the subscription"
+    argument :checkout_item_model, :type => :string, :required => true, :desc => "Item model for stripe chckout"
+
     desc "Koudoku installation generator"
 
     def install
-      
+
       unless defined?(Koudoku)
         gem("koudoku")
       end
-      
+
       require "securerandom"
       api_key = SecureRandom.uuid
       create_file 'config/initializers/koudoku.rb' do
@@ -30,6 +32,7 @@ module Koudoku
 Koudoku.setup do |config|
   config.webhooks_api_key = "#{api_key}"
   config.subscriptions_owned_by = :user
+  config.checkouts_items_is = :item
   config.stripe_publishable_key = ENV['STRIPE_PUBLISHABLE_KEY']
   config.stripe_secret_key = ENV['STRIPE_SECRET_KEY']
   # config.free_trial_length = 30
@@ -40,7 +43,7 @@ RUBY
       # Generate subscription.
       generate("model", "subscription stripe_id:string plan_id:integer last_four:string coupon_id:integer card_type:string current_price:float #{subscription_owner_model}_id:integer")
       gsub_file "app/models/subscription.rb", /ActiveRecord::Base/, "ActiveRecord::Base\n  include Koudoku::Subscription\n\n  belongs_to :#{subscription_owner_model}\n  belongs_to :coupon\n"
-      
+
       # Add the plans.
       generate("model", "plan name:string stripe_id:string price:float interval:string features:text highlight:boolean display_order:integer")
       gsub_file "app/models/plan.rb", /ActiveRecord::Base/, "ActiveRecord::Base\n  include Koudoku::Plan\n  belongs_to :#{subscription_owner_model}\n  belongs_to :coupon\n  has_many :subscriptions\n"
@@ -48,10 +51,15 @@ RUBY
       # Add coupons.
       generate("model coupon code:string free_trial_length:string")
       gsub_file "app/models/coupon.rb", /ActiveRecord::Base/, "ActiveRecord::Base\n  has_many :subscriptions\n"
-      
+
+      # Add checkouts.
+      generate("model", "checkout stripe_charge_id:string #{checkout_item_model}_id:integer #{subscription_owner_model}_id:integer price:float")
+      gsub_file "app/models/checkout.rb", /ActiveRecord::Base/, "ActiveRecord::Base\n  belongs_to :#{checkout_item_model}\n belongs_to :#{subscription_owner_model}\n"
+
       # Update the owner relationship.
-      gsub_file "app/models/#{subscription_owner_model}.rb", /ActiveRecord::Base/, "ActiveRecord::Base\n\n  # Added by Koudoku.\n  has_one :subscription\n\n"
-      
+      gsub_file "app/models/#{subscription_owner_model}.rb", /ActiveRecord::Base/, "ActiveRecord::Base\n\n  # Added by Koudoku.\n  has_one :subscription\n has_many :#{checkout_item_model}, through: :checkouts\n"
+      gsub_file "app/models/#{checkout_item_model}.rb", /ActiveRecord::Base/, "ActiveRecord::Base\n\n  # Added by Koudoku.\n  has_many :#{subscription_owner_model}, through: :checkouts\n"
+
       # Install the pricing table.
       ["_social_proof.html.erb"].each do |file|
         copy_file file, "app/views/koudoku/subscriptions/#{file}"
@@ -68,10 +76,10 @@ Application.routes.draw do
   end
 
 RUBY
-      
+
       # Show the user the API key we generated.
       say "\nTo enable support for Stripe webhooks, point it to \"/koudoku/webhooks?api_key=#{api_key}\". This API key has been randomly generated, so it's unique to your application.\n\n"
-      
+
     end
 
   end
