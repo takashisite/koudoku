@@ -146,7 +146,6 @@ module Koudoku
       if (@subscription.last_four.nil? && plan.price > 0.0 && subscription_params['last_four'].nil?)
 
         @subscription.plan_id = subscription_params['plan_id']
-        logger.debug(@subscription.inspect)
         redirect_to edit_owner_subscription_path(@owner, @subscription, update: 'plan-card', :plan_id => '2')
         return
 

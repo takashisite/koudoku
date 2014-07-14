@@ -13,7 +13,6 @@ module Koudoku
   mattr_accessor :checkouts_items_is
   @@checkouts_items_is = nil
 
-
   mattr_accessor :stripe_publishable_key
   @@stripe_publishable_key = nil
 
@@ -22,6 +21,12 @@ module Koudoku
 
   mattr_accessor :free_trial_length
   @@free_trial_length = nil
+
+  mattr_accessor :stripe_amount
+  @@stripe_amount = nil
+
+  mattr_accessor :stripe_currency
+  @@strupe_currency = nil
 
   def self.setup
     yield self

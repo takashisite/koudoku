@@ -35,6 +35,8 @@ Koudoku.setup do |config|
   config.checkouts_items_is = :item
   config.stripe_publishable_key = ENV['STRIPE_PUBLISHABLE_KEY']
   config.stripe_secret_key = ENV['STRIPE_SECRET_KEY']
+  # config.stripe_currency = "usd"
+  # config.stripe_amount = 100
   # config.free_trial_length = 30
 end
 RUBY
@@ -54,11 +56,11 @@ RUBY
 
       # Add checkouts.
       generate("model", "checkout stripe_charge_id:string #{checkout_item_model}_id:integer #{subscription_owner_model}_id:integer price:float")
-      gsub_file "app/models/checkout.rb", /ActiveRecord::Base/, "ActiveRecord::Base\n  belongs_to :#{checkout_item_model}\n belongs_to :#{subscription_owner_model}\n"
+      gsub_file "app/models/checkout.rb", /ActiveRecord::Base/, "ActiveRecord::Base\n  include Koudoku::Checkout\n  belongs_to :#{checkout_item_model}\n belongs_to :#{subscription_owner_model}\n"
 
       # Update the owner relationship.
-      gsub_file "app/models/#{subscription_owner_model}.rb", /ActiveRecord::Base/, "ActiveRecord::Base\n\n  # Added by Koudoku.\n  has_one :subscription\n has_many :#{checkout_item_model}, through: :checkouts\n"
-      gsub_file "app/models/#{checkout_item_model}.rb", /ActiveRecord::Base/, "ActiveRecord::Base\n\n  # Added by Koudoku.\n  has_many :#{subscription_owner_model}, through: :checkouts\n"
+      gsub_file "app/models/#{subscription_owner_model}.rb", /ActiveRecord::Base/, "ActiveRecord::Base\n\n  # Added by Koudoku.\n  has_one :subscription\n has_many :checkouts\n has_many :#{checkout_item_model}, through: :checkouts\n"
+      gsub_file "app/models/#{checkout_item_model}.rb", /ActiveRecord::Base/, "ActiveRecord::Base\n\n  # Added by Koudoku.\n  has_many :checkouts\n has_many :#{subscription_owner_model}, through: :checkouts\n"
 
       # Install the pricing table.
       ["_social_proof.html.erb"].each do |file|
